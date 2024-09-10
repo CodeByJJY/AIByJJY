@@ -1,1 +1,3 @@
 # AIByJJY
+
+AI programming results
