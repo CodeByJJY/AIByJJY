@@ -1,0 +1,70 @@
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split, cross_val_predict
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import SGDClassifier
+from sklearn.metrics import precision_recall_curve, f1_score, accuracy_score, roc_auc_score, precision_score, recall_score, confusion_matrix
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+data = pd.read_csv('wisconsin_data.csv')
+
+# 1. 데이터 로드
+cancer_data = load_breast_cancer()
+X = cancer_data.data  # 특성 데이터
+y = cancer_data.target  # 레이블 데이터 (악성: 1, 양성: 0)
+
+# 2. 데이터 훈련/테스트 세트로 나누기
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# 3. 데이터 스케일링
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# 4. SGDClassifier 모델 학습
+sgd_clf = SGDClassifier(random_state=42)
+sgd_clf.fit(X_train_scaled, y_train)
+
+# 5. 결정 함수로 점수 계산 (decision_function)
+y_scores = sgd_clf.decision_function(X_test_scaled)
+
+# 6. 정밀도-재현율 곡선 및 임계값 설정
+precisions, recalls, thresholds = precision_recall_curve(y_test, y_scores)
+
+# 7. 재현율이 90% 이상인 임계값 찾기
+recall_threshold = 0.99
+idx_90_recall = np.where(recalls >= recall_threshold)[-1][-1]  # 재현율이 90% 이상인 마지막 인덱스 선택
+optimal_threshold = thresholds[idx_90_recall]
+
+# 최적의 임계값으로 최종 예측
+y_pred_optimal = (y_scores >= optimal_threshold).astype(int)
+
+# 8. 성능 평가 (정확도, F1 스코어, AUC 등)
+accuracy = accuracy_score(y_test, y_pred_optimal)
+precision = precision_score(y_test, y_pred_optimal)
+recall = recall_score(y_test, y_pred_optimal)
+f1 = f1_score(y_test, y_pred_optimal)
+roc_auc = roc_auc_score(y_test, y_scores)
+
+# 8-1. 오차 행렬 만들기
+y_test_pred = cross_val_predict(sgd_clf, X_test_scaled, y_test, cv=3)
+cm = confusion_matrix(y_test, y_test_pred)
+print(cm)
+
+print("최적의 임계값 (재현율 90% 기준):", optimal_threshold)
+print("정확도:", accuracy)
+print("정밀도:", precision)
+print("재현율:", recall)
+print("F1 점수:", f1)
+print("ROC AUC 점수:", roc_auc)
+
+# 9. Precision-Recall Curve 시각화
+plt.plot(thresholds, precisions[:-1], label="Precision")
+plt.plot(thresholds, recalls[:-1], label="Recall")
+plt.axvline(x=optimal_threshold, color='r', linestyle='--', label="Optimal Threshold")
+plt.xlabel("Threshold")
+plt.legend(loc="best")
+plt.title("Precision-Recall Curve")
+plt.grid(True)
+plt.show()
